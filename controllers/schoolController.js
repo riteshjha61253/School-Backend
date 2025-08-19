@@ -1,4 +1,5 @@
 const connection = require('../config/db');
+const { distanceHaversine } = require('../utils/distanceHaversineFunction');
 
 exports.addSchool = (req, res) => {
   const { name, address, latitude, longitude } = req.body;
@@ -24,6 +25,34 @@ exports.addSchool = (req, res) => {
       return res.status(500).json({ error: 'Database error' });
     }
     res.status(201).json({ success: true, id: result.insertId });
+  });
+};
+exports.listSchools = (req, res) => {
+  const userLat = parseFloat(req.query.latitude);
+  const userLon = parseFloat(req.query.longitude);
+
+  if (isNaN(userLat) || userLat < -90 || userLat > 90) {
+    return res.status(400).json({ error: 'Invalid latitude (must be between -90 and 90)' });
+  }
+  if (isNaN(userLon) || userLon < -180 || userLon > 180) {
+    return res.status(400).json({ error: 'Invalid longitude (must be between -180 and 180)' });
+  }
+
+
+  connection.query('SELECT * FROM schools', (err, results) => {
+    if (err) {
+      console.error('Error fetching schools:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    const schoolsWithDistance = results.map(school => ({
+      ...school,
+      distance: distanceHaversine(userLat, userLon, school.latitude, school.longitude)
+    }));
+
+    schoolsWithDistance.sort((a, b) => a.distance - b.distance);
+
+    res.json(schoolsWithDistance);
   });
 };
 
